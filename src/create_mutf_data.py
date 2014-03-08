@@ -71,7 +71,22 @@ def generate_marketwatch_tickers():
                 f.write("%s|%s\n" % (ticker, name))
 
 
-def download_fund_page(ticker, download_folder):
+def gfnc_fund_page_downloader(ticker, download_folder):
+    """
+    Downloades one page per mutual fund from Google finance
+    @type ticker: str
+    @param ticker: Ticker symbol
+    @return: None
+    """
+    pageurl = "http://www.google.com/finance?q=" + ticker
+    response = requests.get(pageurl)
+    filename = "%s/%s.html" % (download_folder, ticker)
+
+    with open(filename, "w") as f:
+        f.write(response.content)
+
+
+def yfnc_fund_page_downloader(ticker, download_folder):
     """
     Downloads profile, performance and risk pages for a mutual fund with symbol 'ticker'
     from Yahoo Finance.
@@ -96,22 +111,26 @@ def download_fund_page(ticker, download_folder):
 def download_fund_pages(csvfile, delimiter="|"):
     """
     Reads records from the supplied delimited file, extracts ticker symbol and passes
-    on to download_fund_page(ticker) for the actual download task
+    on to yfnc_fund_page_downloader(ticker) for the actual download task
      @param: None
      @return: None
     """
-    download_folder = "../html"
+    download_folder = "../google_finance_fund_pages"
+
+    # Start a fresh downloads folder. If exists, delete and create. If does not exist,
+    # just create.
     if os.path.exists(download_folder):
         shutil.rmtree(download_folder)
         os.makedirs(download_folder)
     else:
         os.makedirs(download_folder)
 
+    # Read the csvfile, and download page(s) for each ticker symbol.
     ticker_reader = csv.reader(open(csvfile, "rb"), delimiter=delimiter)
     for ticker, name in ticker_reader:
         print "downloading %s: %s..." % (ticker, name)
-        download_fund_page(ticker, download_folder)
-
+        # yfnc_fund_page_downloader(ticker, download_folder)
+        gfnc_fund_page_downloader(ticker, download_folder)
 
 # def download_morningstar_tickers():
 #     """
@@ -408,8 +427,8 @@ def standardize_risk(inputfile_name, outputfile_name, cols_to_stdize):
 def main():
     # download_marketwatch_mutf_symbol_pages()
     # generate_marketwatch_tickers()
-    # download_fund_pages("../marketwatch_mutf_tickers/marketwatch_ticker_list.csv",
-    #                     delimiter="|")
+    download_fund_pages("../marketwatch_mutf_tickers/marketwatch_ticker_list.csv",
+                        delimiter="|")
 
     # # Generate list of tickers
     # with open("../marketwatch_mutf_tickers/marketwatch_ticker_list.csv", "rb") as f:
@@ -423,7 +442,7 @@ def main():
                       "ar_expense_ratio", "inception", "12b1_fees",
                       "turnover", "turnover_cat"]
     # generate_data_file(profile_fields, tickers, get_profile, "../csv/fund_profiles.csv")
-    standardize_profile("../csv/fund_profiles.csv", "../csv/fund_profiles_std.csv")
+    # standardize_profile("../csv/fund_profiles.csv", "../csv/fund_profiles_std.csv")
 
     # # Generate CSV file for performance data
     performance_fields = ["ticker", "R1", "R3", "R5", "R10"]
@@ -443,7 +462,7 @@ def main():
                    "sd3_cat", "sd5_cat", "sd10_cat"
                    ]
     # generate_data_file(risk_fields, tickers, get_risk, "../csv/fund_risk.csv")
-    standardize_risk("../csv/fund_risk.csv", "../csv/fund_risk_std.csv", range(1, len(risk_fields)))
+    # standardize_risk("../csv/fund_risk.csv", "../csv/fund_risk_std.csv", range(1, len(risk_fields)))
 
 
 if __name__ == "__main__":
