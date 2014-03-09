@@ -1,151 +1,11 @@
 import csv
 from pprint import pprint
-import os
 import re
 import string
-import shutil
 
 from bs4 import BeautifulSoup
-import requests
 
-
-def download_marketwatch_mutf_symbol_pages():
-    """
-    We want to decouple downloading of fund ticker web pages from
-    their scraping. Too many programmatic hits to marketwatch is likely
-    to get us banned for an interval of time; so we download the HTMLs
-    containing ticker symbols and _then_ scrape the HTMLs to extract
-    <ticker>:<name> key-value pairs.
-
-    To ensure clean download, this function creates
-    "./marketwatch_mutf_tickers" folder to store the HTMLs if the folder
-    doesnt exist already. If it exists, the folder tree is deleted and
-    recreated.
-
-    In a typical situation, this function should be run once at the start of
-    the data gathering pipeine.
-    """
-
-    marketwatch_download_folder = "../marketwatch_mutf_tickers"
-    if os.path.exists(marketwatch_download_folder):
-        shutil.rmtree(marketwatch_download_folder)
-        os.makedirs(marketwatch_download_folder)
-    else:
-        os.makedirs(marketwatch_download_folder)
-
-    marketwatch_url_base = "http://www.marketwatch.com/tools/mutual-fund/list/"
-
-    for startletter in string.ascii_uppercase:
-        marketwatch_url = marketwatch_url_base + startletter
-        print "downloading %s..." % (marketwatch_url)
-        response = requests.get(marketwatch_url)
-        with open(marketwatch_download_folder + "/" + startletter + ".html", "w") as f:
-            f.write(response.content)
-
-
-def generate_marketwatch_tickers():
-    """
-    This function, scrapes ticker HTMLs in "./marketwatch_mutf_tickers" and generates
-    <ticker>:<name> key-value pairs and writes it as a DSV file.
-    """
-    # Generate a regex pattern to match mutual funds. Ticker ymbols are anywhere between
-    # UPPERCASE 2-5 characters
-
-    pattern = re.compile("/[A-Z]{2,5}")
-    marketwatch_download_folder = "../marketwatch_mutf_tickers"
-    assert os.path.exists(marketwatch_download_folder), \
-        "Folder %s does not exist" % marketwatch_download_folder
-
-    tickerlist_file = "%s/%s" % (marketwatch_download_folder,
-                                 "marketwatch_ticker_list.csv")
-    with open(tickerlist_file, "w") as f:
-        for startletter in string.ascii_uppercase:
-            html_filepath = "%s/%s.html" % (marketwatch_download_folder, startletter)
-            soup = BeautifulSoup(open(html_filepath).read())
-            fundname_tags = soup.findAll("td", class_="quotelist-name")
-            fundnames = [tag.text for tag in fundname_tags]
-            fundtickers = [re.findall(pattern, tag.find("a").attrs["href"])[0][1:]
-                           for tag in fundname_tags]
-            for ticker, name in zip(fundtickers, fundnames):
-                print "%s:%s" % (ticker, name)
-                f.write("%s|%s\n" % (ticker, name))
-
-
-def gfnc_fund_page_downloader(ticker, download_folder):
-    """
-    Downloades one page per mutual fund from Google finance
-    @type ticker: str
-    @param ticker: Ticker symbol
-    @return: None
-    """
-    pageurl = "http://www.google.com/finance?q=" + ticker
-    response = requests.get(pageurl)
-    filename = "%s/%s.html" % (download_folder, ticker)
-
-    with open(filename, "w") as f:
-        f.write(response.content)
-
-
-def yfnc_fund_page_downloader(ticker, download_folder):
-    """
-    Downloads profile, performance and risk pages for a mutual fund with symbol 'ticker'
-    from Yahoo Finance.
-    @type ticker: str
-    @param ticker: Ticker symbol
-    @return: None
-    """
-    profileurl = "http://finance.yahoo.com/q/pr?s=" + ticker
-    performanceurl = "http://finance.yahoo.com/q/pm?s=" + ticker
-    riskurl = "http://finance.yahoo.com/q/rk?s=" + ticker
-
-    urls = {"profile": profileurl,
-            "performance": performanceurl,
-            "risk": riskurl}
-    for kind in urls:
-        response = requests.get(urls[kind])
-        filename = "%s/%s_%s.html" % (download_folder, ticker, kind)
-        with open(filename, "w") as f:
-            f.write(response.content)
-
-
-def download_fund_pages(csvfile, delimiter="|"):
-    """
-    Reads records from the supplied delimited file, extracts ticker symbol and passes
-    on to yfnc_fund_page_downloader(ticker) for the actual download task
-     @param: None
-     @return: None
-    """
-    download_folder = "../google_finance_fund_pages"
-
-    # Start a fresh downloads folder. If exists, delete and create. If does not exist,
-    # just create.
-    if os.path.exists(download_folder):
-        shutil.rmtree(download_folder)
-        os.makedirs(download_folder)
-    else:
-        os.makedirs(download_folder)
-
-    # Read the csvfile, and download page(s) for each ticker symbol.
-    ticker_reader = csv.reader(open(csvfile, "rb"), delimiter=delimiter)
-    for ticker, name in ticker_reader:
-        print "downloading %s: %s..." % (ticker, name)
-        # yfnc_fund_page_downloader(ticker, download_folder)
-        gfnc_fund_page_downloader(ticker, download_folder)
-
-# def download_morningstar_tickers():
-#     """
-#     Generate list of all fidelity mutual fund names
-#     """
-#     soup = BeautifulSoup(open("./fidelity_funds.html"))
-#     pattern = re.compile("t=[A-Z]{5}")
-#
-#     #Mutual fund information is contained in td tags with class = "msNormal"
-#     mtf_list = soup.find_all("td", class_="msNormal")
-#     fundtags = [mf.find("a") for mf in mtf_list]
-#     fundnames = [l.text for l in fundtags]
-#     fundlinks = [t["href"].lstrip() for t in fundtags]
-#     fundtickers = [re.findall(pattern, l)[0].split("=")[1] for l in fundlinks]
-#     return dict(zip(fundtickers, fundnames))
+from ticker_generator import TickerGenerator
 
 
 def get_profile(tkr):
@@ -425,8 +285,10 @@ def standardize_risk(inputfile_name, outputfile_name, cols_to_stdize):
 
 
 def main():
-    # download_marketwatch_mutf_symbol_pages()
-    # generate_marketwatch_tickers()
+    td = TickerGenerator(downloads_folder="../test_ticker_downloader")
+    td.download_marketwatch_ticker_pages("http://www.marketwatch.com/tools/mutual-fund/list/")
+    td.extract_marketwatch_tickers("../csv/test_ticker_list.csv")
+
     download_fund_pages("../marketwatch_mutf_tickers/marketwatch_ticker_list.csv",
                         delimiter="|")
 
