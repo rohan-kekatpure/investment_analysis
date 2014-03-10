@@ -18,10 +18,24 @@ class FundpageDownloader:
     yfnc_baseurl_risk = "http://finance.yahoo.com/q/rk?s="
 
     def __init__(self, tickerlist_file=None,
-                 delimiter = "|",
-                 downloads_folder=default_download_folder):
+                 delimiter="|",
+                 downloads_folder=default_download_folder,
+                 source="gfnc"):
+        """
+        @param tickerlist_file: Pipe delimited file of <ticker>|<fundname>
+        @type tickerlist_file: str
+        @param delimiter: Delimiter used in tickerlist_file
+        @type delimiter: str
+        @param downloads_folder: Folder to put downloaded HTML
+        @type downloads_folder: str
+        @param source: One of the predefined download sources. Currently supported
+        options are "gfnc" for google finance and "yfnc" for yahoo finance.
+
+        """
         # Start a fresh downloads folder. If exists, delete and create. If doesn't exist,
         # just create.
+
+        self.source = source
         self.downloads_folder = downloads_folder
         if os.path.exists(downloads_folder):
             shutil.rmtree(downloads_folder)
@@ -34,32 +48,32 @@ class FundpageDownloader:
 
         # Generate list of tickers from tickerlist_file and store in self.tickers
         with open(tickerlist_file, "rb") as f:
-            reader = csv.reader(f, delimiter=delimiter)
-            self.tickers = [record[0] for record in reader]
+            tickerlist = list(csv.reader(f, delimiter="|"))
+            symbs = [record[0] for record in tickerlist]
+            fundnames = [record[1] for record in tickerlist]
+            self.funds = dict(zip(symbs, fundnames))
+            del tickerlist, symbs, fundnames
 
-    def download_fundpages(self, source="gfnc"):
+    def download_fundpages(self):
             """
             Reads records from the supplied delimited file, extracts ticker symbol and passes
             on to yfnc_fund_page_downloader(ticker) for the actual download task
-
-             @param source: One of the predefined download sources. Currently supported
-             options are "gfnc" for google finance and "yfnc" for yahoo finance.
             """
-            for ticker in self.tickers:
+            for ticker in self.funds:
                 print "downloading fundpage for %s..." % ticker
-                if source == "gfnc":
-                    self.download_gfnc_fundpages(ticker)
-                elif source == "yfnc":
-                    self.download_yfnc_fundpages(ticker)
+                if self.source == "gfnc":
+                    self.download_gfnc_fundpage(ticker)
+                elif self.source == "yfnc":
+                    self.download_yfnc_fundpage(ticker)
 
             # Validate that all downloaded pages contain valid data. Fast programmatic
             # hits to Google finance pages results in come pages getting CAPTCHA response.
             # The validator function writes un-downloaded symbols to a separate file.
 
-            if source == "gfnc":
+            if self.source == "gfnc":
                 self.validate_gfnc_fundpages()
 
-    def download_gfnc_fundpages(self, ticker):
+    def download_gfnc_fundpage(self, ticker):
         """
         Downloades one page per mutual fund from Google finance
         @type ticker: str
@@ -73,7 +87,7 @@ class FundpageDownloader:
         with open(filename, "w") as f:
             f.write(response.content)
 
-    def download_yfnc_fundpages(self, ticker):
+    def download_yfnc_fundpage(self, ticker):
         """
         Downloads profile, performance and risk pages for a mutual fund with symbol 'ticker'
         from Yahoo Finance.
@@ -100,11 +114,17 @@ class FundpageDownloader:
         The ones without data have captchas. We locate presencee of captchas
         to detect un-downloaded pages
         """
-        not_downloaded_file = "../csv/not_downloaded.csv"
-        with open(not_downloaded_file, "wb") as f:
-            writer = csv.writer(f)
-            for ticker in self.tickers:
-                page = os.path.join(self.downloads_folder, "%s.html" % ticker)
+        not_downloaded = "../csv/not_downloaded.csv"
+        with open(not_downloaded, "wb") as f:
+            writer = csv.writer(f, delimiter="|")
+            for ticker in self.funds:
+                print ticker
+                page = os.path.join("../google_finance_fund_pages", "%s.html" % ticker)
                 soup = BeautifulSoup(open(page))
-                if soup.find("body").attrs["onload"].find("captcha") > -1:
-                    writer.writerow(ticker)
+                body = soup.find("body")
+                try:
+                    if "captcha" in body.attrs["onload"]:
+                        print "Not downloaded %s" % ticker
+                        writer.writerow([ticker, self.funds[ticker]])
+                except KeyError:
+                    pass
