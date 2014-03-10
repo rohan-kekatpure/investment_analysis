@@ -3,6 +3,7 @@ import os
 import shutil
 from bs4 import BeautifulSoup
 import requests
+import time
 
 
 class FundpageDownloader:
@@ -20,7 +21,8 @@ class FundpageDownloader:
     def __init__(self, tickerlist_file=None,
                  delimiter="|",
                  downloads_folder=default_download_folder,
-                 source="gfnc"):
+                 source="gfnc",
+                 fresh=False):
         """
         @param tickerlist_file: Pipe delimited file of <ticker>|<fundname>
         @type tickerlist_file: str
@@ -30,18 +32,29 @@ class FundpageDownloader:
         @type downloads_folder: str
         @param source: One of the predefined download sources. Currently supported
         options are "gfnc" for google finance and "yfnc" for yahoo finance.
+        @type source: str
+        @param fresh: Delete and recreate downloads folder
+        @type fresh: bool
 
         """
         # Start a fresh downloads folder. If exists, delete and create. If doesn't exist,
         # just create.
+        self.downloads_folder = downloads_folder
+
+        # If 'fresh' is True,
+        if fresh:
+            if os.path.exists(self.downloads_folder):
+                shutil.rmtree(self.downloads_folder)
+                os.makedirs(self.downloads_folder)
+            else:
+                os.makedirs(self.downloads_folder)
+        else:
+            assert os.path.exists(self.downloads_folder), \
+                '''[FundpageDownloader] Downloads folder %s does not exist.
+                Either create externally or create new downloader instance with fresh=True'''\
+                % tickerlist_file
 
         self.source = source
-        self.downloads_folder = downloads_folder
-        if os.path.exists(downloads_folder):
-            shutil.rmtree(downloads_folder)
-            os.makedirs(downloads_folder)
-        else:
-            os.makedirs(downloads_folder)
 
         assert os.path.exists(tickerlist_file), \
             "[FundpageDownloader] Tickerlist file %s does not exist" % tickerlist_file
@@ -71,7 +84,7 @@ class FundpageDownloader:
             # The validator function writes un-downloaded symbols to a separate file.
 
             if self.source == "gfnc":
-                self.validate_gfnc_fundpages()
+                self.list_failed_downloads()
 
     def download_gfnc_fundpage(self, ticker):
         """
@@ -108,17 +121,25 @@ class FundpageDownloader:
             with open(filename, "w") as f:
                 f.write(response.content)
 
-    def validate_gfnc_fundpages(self):
+    def list_failed_downloads(self):
         """
         Separates downloaded webpages into those with data and those without.
         The ones without data have captchas. We locate presencee of captchas
         to detect un-downloaded pages
         """
-        not_downloaded = "../csv/not_downloaded.csv"
-        with open(not_downloaded, "wb") as f:
+        print "Generating failed downloads..."
+
+        failed_downloads = "../csv/failed_downloads.csv"
+
+        # If a 'failed_downloads' file exists already, rename it by appending a current
+        # timestamp to its name.
+        if os.path.exists(failed_downloads):
+            old_failed_downloads = "../csv/failed_downloads_%s.csv" % str(int(time.time()))
+            os.rename(failed_downloads, old_failed_downloads)
+
+        with open(failed_downloads, "wb") as f:
             writer = csv.writer(f, delimiter="|")
             for ticker in self.funds:
-                print ticker
                 page = os.path.join("../google_finance_fund_pages", "%s.html" % ticker)
                 soup = BeautifulSoup(open(page))
                 body = soup.find("body")
