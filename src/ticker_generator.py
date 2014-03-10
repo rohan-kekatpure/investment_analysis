@@ -14,7 +14,6 @@ class TickerGenerator:
     banned for an interval of time; so we download the HTMLs containing ticker symbols
     and _then_ scrape the HTMLs to extract <ticker>:<name> key-value pairs.
 
-
     The class has different methods for various download sites such as Morningstar,
     marketwatch. Custom methods for other sites can be added as needed.
     """

@@ -46,13 +46,12 @@ class YfncFundpageScraper:
         @param delimiter: delimiter in tickerlist_file
         @type delimiter: str
         """
-
         self.fundpages_location = fundpages_location
-        assert os.path.exists(tickerlist_file), \
-            "[YfncFundpageScraper] Folder %s does not exist" % tickerlist_file
-
         assert os.path.exists(self.fundpages_location), \
             "[YfncFundpageScraper] Folder %s does not exist" % self.fundpages_location
+
+        assert os.path.exists(tickerlist_file), \
+            "[YfncFundpageScraper] Folder %s does not exist" % tickerlist_file
 
         # Generate list of tickers from tickerlist_file and store in self.tickers
         with open(tickerlist_file, "rb") as f:
