@@ -12,15 +12,17 @@ class FundpageDownloader:
     """
 
     # Static variables: Base urls for download links
-    default_download_folder = "./_fund_pages_html"
-    gfnc_baseurl = "http://www.google.com/finance?q="
+    # gfnc_baseurl = "http://www.google.com/finance?q="
+    # this narros down search to mutual funds
+    gfnc_baseurl = "http://www.google.com/finance?q=MUTF%3A"
     yfnc_baseurl_profile = "http://finance.yahoo.com/q/pr?s="
     yfnc_baseurl_performance = "http://finance.yahoo.com/q/pm?s="
     yfnc_baseurl_risk = "http://finance.yahoo.com/q/rk?s="
 
     def __init__(self, tickerlist_file=None,
                  delimiter="|",
-                 downloads_folder=default_download_folder,
+                 downloads_folder=None,
+                 failed_downloads_file=None,
                  source="gfnc",
                  fresh=False):
         """
@@ -40,6 +42,7 @@ class FundpageDownloader:
         # Start a fresh downloads folder. If exists, delete and create. If doesn't exist,
         # just create.
         self.downloads_folder = downloads_folder
+        self.failed_downloads_file = failed_downloads_file
 
         # If 'fresh' is True,
         if fresh:
@@ -78,6 +81,7 @@ class FundpageDownloader:
                     self.download_gfnc_fundpage(ticker)
                 elif self.source == "yfnc":
                     self.download_yfnc_fundpage(ticker)
+                # insert delay here.
 
             # Validate that all downloaded pages contain valid data. Fast programmatic
             # hits to Google finance pages results in come pages getting CAPTCHA response.
@@ -129,22 +133,22 @@ class FundpageDownloader:
         """
         print "Generating failed downloads..."
 
-        failed_downloads = "../csv/failed_downloads.csv"
+        # failed_downloads = "../csv/failed_downloads.csv"
 
         # If a 'failed_downloads' file exists already, rename it by appending a current
         # timestamp to its name.
-        if os.path.exists(failed_downloads):
-            old_failed_downloads = "../csv/failed_downloads_%s.csv" % str(int(time.time()))
-            os.rename(failed_downloads, old_failed_downloads)
+        if os.path.exists(self.failed_downloads_file):
+            print "found failed downloads file %s" % self.failed_downloads_file
+            old_failed_downloads = "%s.%s" % (self.failed_downloads_file, str(int(time.time())))
+            os.rename(self.failed_downloads_file, old_failed_downloads)
 
-        with open(failed_downloads, "wb") as f:
+        with open(self.failed_downloads_file, "wb") as f:
             writer = csv.writer(f, delimiter="|")
             for ticker in self.funds:
-                page = os.path.join("../google_finance_fund_pages", "%s.html" % ticker)
+                page = os.path.join(self.downloads_folder, "%s.html" % ticker)
                 soup = BeautifulSoup(open(page))
-                body = soup.find("body")
                 try:
-                    if "captcha" in body.attrs["onload"]:
+                    if "captcha" in soup.body.attrs["onload"]:
                         print "Not downloaded %s" % ticker
                         writer.writerow([ticker, self.funds[ticker]])
                 except KeyError:
