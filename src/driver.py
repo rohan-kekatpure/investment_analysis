@@ -26,7 +26,7 @@ fundpage_downloader = FundpageDownloader(tickerlist_file=failed_downloads_file,
 while len(open(failed_downloads_file).readlines()) > 0:
     fundpage_downloader.download_fundpages()
 
-
+# fundpage_downloader.list_failed_downloads()
 
 
 # test scraper

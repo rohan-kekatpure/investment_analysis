@@ -68,6 +68,7 @@ class FundpageDownloader:
             symbs = [record[0] for record in tickerlist]
             fundnames = [record[1] for record in tickerlist]
             self.funds = dict(zip(symbs, fundnames))
+            self.nfunds = len(tickerlist)
             del tickerlist, symbs, fundnames
 
     def download_fundpages(self):
@@ -75,18 +76,21 @@ class FundpageDownloader:
             Reads records from the supplied delimited file, extracts ticker symbol and passes
             on to yfnc_fund_page_downloader(ticker) for the actual download task
             """
-            for ticker in self.funds:
-                print "downloading fundpage for %s..." % ticker
+
+            for count, ticker in enumerate(self.funds):
+                print "downloading (%s of %s) %s..." % (count, self.nfunds, ticker),
                 if self.source == "gfnc":
-                    self.download_gfnc_fundpage(ticker)
+                    downloaded_page_size = self.download_gfnc_fundpage(ticker)
+                    # if downloaded_page_size < 3000:
+                    #     time.sleep(5)
+                    print "%s KB" % round(downloaded_page_size / 1000.0)
+                    time.sleep(5)
                 elif self.source == "yfnc":
                     self.download_yfnc_fundpage(ticker)
-                # insert delay here.
 
             # Validate that all downloaded pages contain valid data. Fast programmatic
             # hits to Google finance pages results in come pages getting CAPTCHA response.
             # The validator function writes un-downloaded symbols to a separate file.
-
             if self.source == "gfnc":
                 self.list_failed_downloads()
 
@@ -103,6 +107,7 @@ class FundpageDownloader:
 
         with open(filename, "w") as f:
             f.write(response.content)
+        return os.path.getsize(filename)
 
     def download_yfnc_fundpage(self, ticker):
         """
