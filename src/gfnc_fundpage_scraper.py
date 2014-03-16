@@ -32,7 +32,13 @@ class GfncFundpageScraper(AbstractScraper):
         # @TODO: Delegation after creating the soup
         # Soup creation is an expensive step and it may make more sense to
         # delegate after generating the soup of the downloaded page.
-        self.get_performance2(outputfile=outputfile)
+
+        # outputfile_performance = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_performance")
+        # self.get_performance(outputfile=outputfile)
+
+        outputfile_risk = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_risk")
+        print "writing to file %s" % outputfile_risk
+        self.get_risk(outputfile=outputfile_risk)
 
     def get_risk(self, outputfile=None):
         """
@@ -49,47 +55,56 @@ class GfncFundpageScraper(AbstractScraper):
         risk_list = []
         for ticker_no, ticker in enumerate(self.tickers):
             page = os.path.join(self.fundpages_location, "%s.html" % ticker)
+            # print "scraping page %s" % page
             newpage, errors = tidy_document(open(page).read())
             soup = BeautifulSoup(newpage)
-
-            # Retrieve the risk table by descending into the DOM
-            risktable = \
-                soup\
-                .body\
-                .div(id='gf-viewc')[0]\
-                .findAll('div', class_='fjfe-content')[0]\
-                .findAll('div', class_='mutualfund')[0]\
-                .findAll('div', class_='g-section g-tpl-right-1')[0]\
-                .findAll('div', class_='g-unit')[1]\
-                .findAll('div', class_='g-c sfe-break-right')[0]\
-                .findAll('div', class_='sector')[1]\
-                .findAll('div', class_='subsector')[0].table
-
-            riskdata_raw = [
-                [row.text.strip() for row in rows.findAll('td')]
-                for rows in risktable.findAll('tr')
-            ]
-
-            # Convert available fields to float. Unavailable fields are presented as '-'
-            # in the html, convert them to empty strings.
-            riskdata_float = [map(lambda x: float(x) if x != '-' else '', R[1:])
-                              for R in riskdata_raw[1:-1]]
-
-            # Initialize a dict for the risk data of this ticker and add all the
-            # fields
+            # Initialize a dict to hold risk data of this ticker. The data will be added
+            # at the ned of the try block
             riskdata_dict = {"ticker": ticker}
-            for field_type, field_data in zip(risk_fields, riskdata_float):
-                riskdata_dict.update(dict(zip(field_type, field_data)))
+
+            try:
+                # Retrieve the risk table by descending into the DOM
+                risktable = \
+                    soup\
+                    .body\
+                    .div(id='gf-viewc')[0]\
+                    .findAll('div', class_='fjfe-content')[0]\
+                    .findAll('div', class_='mutualfund')[0]\
+                    .findAll('div', class_='g-section g-tpl-right-1')[0]\
+                    .findAll('div', class_='g-unit')[1]\
+                    .findAll('div', class_='g-c sfe-break-right')[0]\
+                    .findAll('div', class_='sector')[1]\
+                    .findAll('div', class_='subsector')[0].table
+
+                riskdata_raw = [
+                    [row.text.strip() for row in rows.findAll('td')]
+                    for rows in risktable.findAll('tr')
+                ]
+
+                # Convert available fields to float. Unavailable fields are presented as '-'
+                # in the html, convert them to empty strings.
+                riskdata_float = [map(lambda x: float(x) if x != '-' else '', R[1:])
+                                  for R in riskdata_raw[1:-1]]
+
+                # Add the risk data for this ticker to riskdata_dict
+                for field_type, field_data in zip(risk_fields, riskdata_float):
+                    riskdata_dict.update(dict(zip(field_type, field_data)))
+            except (IndexError, AttributeError):
+                # print "page could not be scraped for ticker %s" % ticker
 
             # Append risk data for the current ticker to the list
             risk_list.append(riskdata_dict)
 
-        # Flatten the risk_fields to feed to the CSV writer
-        risk_fields_flattened = reduce(lambda x, y: x + y, risk_fields)
-        risk_fields_flattened = ["ticker"] + risk_fields_flattened
+            # Print progress
+            if ticker_no % 100 == 0:
+                print "%d of %d" % (ticker_no, ticker_count)
+
+        # Flatten the risk_fields to feed to the CSV writer and add field
+        # "ticker" at the front
+        risk_fields_flattened = ["ticker"] + reduce(lambda x, y: x + y, risk_fields)
 
         # Write the CSV file
-        super(GfncFundpageScraper, self).writecsv(risk_fields, risk_list, outputfile)
+        super(GfncFundpageScraper, self).writecsv(risk_fields_flattened, risk_list, outputfile)
 
     def get_performance(self, outputfile=None):
         """
