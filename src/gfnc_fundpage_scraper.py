@@ -1,8 +1,7 @@
-import csv
 import os
 import re
 from bs4 import BeautifulSoup
-import sys
+from tidylib import tidy_document
 from abstract_scraper import AbstractScraper
 
 
@@ -25,13 +24,26 @@ class GfncFundpageScraper(AbstractScraper):
 
     def scrape(self, outputfile=None):
         """
-        Actual scraping is done here
+        Delegator function for google finance scraper
         @param outputfile: name of output CSV file where info is to be written
         @type outputfile: str
         """
-        self.get_performance(outputfile=outputfile)
+
+        # @TODO: Delegation after creating the soup
+        # Soup creation is an expensive step and it may make more sense to
+        # delegate after generating the soup of the downloaded page.
+        self.get_performance2(outputfile=outputfile)
+
+    def get_risk(self, outputfile=None):
+        """
+        Scraper function to get risk data
+        """
+        pass
 
     def get_performance(self, outputfile=None):
+        """
+        Scraper function to get performance data
+        """
         # Strings for intervals for which return information is vailable in Google Finance
         durations = ["1 day", "1 week", "4 week", "3 month", "YTD",
                      "1 year", "3 years", "5 years"]
@@ -76,3 +88,49 @@ class GfncFundpageScraper(AbstractScraper):
 
         # write performance data to a CSV file
         super(GfncFundpageScraper, self).writecsv(["ticker"] + durations, performance_list, outputfile)
+
+    def get_performance2(self, outputfile=None):
+        """
+        Alternate scraper function to get performance data. Laborious, slower, but direct
+        """
+
+        # Strings for intervals for which return information is vailable in Google Finance
+        header = ["ticker", "1 day", "1 week", "4 week", "3 month", "YTD",
+                  "1 year", "3 years", "5 years"]
+
+        # Pattern for detecting performance strings
+        pattern = pattern=re.compile("[ ]+([\+\-]\d*\.*\d*)%*")
+        ticker_count = len(self.tickers)
+        fund_performances = []
+        for ticker_no, ticker in enumerate(self.tickers):
+            page = os.path.join(self.fundpages_location, "%s.html" % ticker)
+            tidy_html, errors = tidy_document(open(page).read())
+            soup = BeautifulSoup(tidy_html)
+            try:
+                performance_tags\
+                    = soup.body.div(id="gf-viewc")[0] \
+                    .find('div', class_='fjfe-content')\
+                    .find('div', class_='mutualfund')\
+                    .find('div', class_='g-section g-tpl-right-1')\
+                    .find('div', class_='g-unit g-first')\
+                    .find('div', class_='g-c')\
+                    .find('div', class_='sector performance')\
+                    .findAll('div', class_='subsector')[1]\
+                    .find('table')\
+                    .findAll('tr')[::2]
+
+                performance_data_strings = \
+                    filter(lambda x: x != u'', [u.text.encode('ascii', errors='ignore').replace("\n", "").strip()
+                                                for u in performance_tags])
+                performance_data = [re.search(pattern, s).group(1) for s in performance_data_strings[:-1]]
+            except AttributeError:
+                performance_data = []
+
+            fund_performances.append(zip(header, [ticker] + performance_data))
+
+            # Print progress
+            if ticker_no % 100 == 0:
+                print "%d of %d" % (ticker_no, ticker_count)
+
+        # write performance data to a CSV file
+        super(GfncFundpageScraper, self).writecsv(header, fund_performances, outputfile)
