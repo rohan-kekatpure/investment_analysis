@@ -38,15 +38,66 @@ class GfncFundpageScraper(AbstractScraper):
         """
         Scraper function to get risk data
         """
-        pass
+        risk_fields = [["alpha1", "alpha3", "alpha5", "alpha10"],
+                       ["beta1", "beta3", "beta5", "beta10"],
+                       ["MAR1", "MAR3", "MAR5", "MAR10"],
+                       ["R2_1", "R2_3", "R2_5", "R2_10"],
+                       ["SD1", "SD3", "SD5", "SD10"],
+                       ["sharpe1", "sharpe3", "sharpe5", "sharpe10"]]
+
+        ticker_count = len(self.tickers)
+        risk_list = []
+        for ticker_no, ticker in enumerate(self.tickers):
+            page = os.path.join(self.fundpages_location, "%s.html" % ticker)
+            newpage, errors = tidy_document(open(page).read())
+            soup = BeautifulSoup(newpage)
+
+            # Retrieve the risk table by descending into the DOM
+            risktable = \
+                soup\
+                .body\
+                .div(id='gf-viewc')[0]\
+                .findAll('div', class_='fjfe-content')[0]\
+                .findAll('div', class_='mutualfund')[0]\
+                .findAll('div', class_='g-section g-tpl-right-1')[0]\
+                .findAll('div', class_='g-unit')[1]\
+                .findAll('div', class_='g-c sfe-break-right')[0]\
+                .findAll('div', class_='sector')[1]\
+                .findAll('div', class_='subsector')[0].table
+
+            riskdata_raw = [
+                [row.text.strip() for row in rows.findAll('td')]
+                for rows in risktable.findAll('tr')
+            ]
+
+            # Convert available fields to float. Unavailable fields are presented as '-'
+            # in the html, convert them to empty strings.
+            riskdata_float = [map(lambda x: float(x) if x != '-' else '', R[1:])
+                              for R in riskdata_raw[1:-1]]
+
+            # Initialize a dict for the risk data of this ticker and add all the
+            # fields
+            riskdata_dict = {"ticker": ticker}
+            for field_type, field_data in zip(risk_fields, riskdata_float):
+                riskdata_dict.update(dict(zip(field_type, field_data)))
+
+            # Append risk data for the current ticker to the list
+            risk_list.append(riskdata_dict)
+
+        # Flatten the risk_fields to feed to the CSV writer
+        risk_fields_flattened = reduce(lambda x, y: x + y, risk_fields)
+        risk_fields_flattened = ["ticker"] + risk_fields_flattened
+
+        # Write the CSV file
+        super(GfncFundpageScraper, self).writecsv(risk_fields, risk_list, outputfile)
 
     def get_performance(self, outputfile=None):
         """
         Scraper function to get performance data
         """
         # Strings for intervals for which return information is vailable in Google Finance
-        durations = ["1 day", "1 week", "4 week", "3 month", "YTD",
-                     "1 year", "3 years", "5 years"]
+        performance_fields = ["1 day", "1 week", "4 week", "3 month", "YTD",
+                              "1 year", "3 years", "5 years"]
 
         # Common pattern
         # The common pattern (base_pattern) is constructed by inspecting the performance_info
@@ -61,10 +112,10 @@ class GfncFundpageScraper(AbstractScraper):
         base_pattern_string = "[\*]{0,1}[ ]+([\+\-]{1}[\d]+\.[\d]+)%"
 
         # Regex patterns for extracting returns for these intervals
-        intvl_patterns = [re.compile("%s%s" % (durn, base_pattern_string)) for durn in durations]
+        intvl_patterns = [re.compile("%s%s" % (durn, base_pattern_string)) for durn in performance_fields]
 
         # Create tuples of duration strings and their corresponding regexes
-        dur_patterns = zip(durations, intvl_patterns)
+        dur_patterns = zip(performance_fields, intvl_patterns)
 
         ticker_count = len(self.tickers)
         performance_list = []
@@ -87,7 +138,7 @@ class GfncFundpageScraper(AbstractScraper):
                 print "%d of %d" % (ticker_no, ticker_count)
 
         # write performance data to a CSV file
-        super(GfncFundpageScraper, self).writecsv(["ticker"] + durations, performance_list, outputfile)
+        super(GfncFundpageScraper, self).writecsv(["ticker"] + performance_fields, performance_list, outputfile)
 
     def get_performance2(self, outputfile=None):
         """
@@ -95,14 +146,14 @@ class GfncFundpageScraper(AbstractScraper):
         """
 
         # Strings for intervals for which return information is vailable in Google Finance
-        header = ["ticker", "1 day", "1 week", "4 week", "3 month", "YTD",
-                  "1 year", "3 years", "5 years"]
+        performance_fields = ["ticker", "1 day", "1 week", "4 week", "3 month", "YTD",
+                              "1 year", "3 years", "5 years"]
 
         # Pattern for detecting performance strings
-        pattern = pattern=re.compile("[ ]+([\+\-]\d*\.*\d*)%*")
+        pattern = pattern = re.compile("[ ]+([\+\-]\d*\.*\d*)%*")
         ticker_count = len(self.tickers)
         fund_performances = []
-        for ticker_no, ticker in enumerate(self.tickers):
+        for ticker_no, ticker in enumerate(self.tickers[:10]):
             page = os.path.join(self.fundpages_location, "%s.html" % ticker)
             tidy_html, errors = tidy_document(open(page).read())
             soup = BeautifulSoup(tidy_html)
@@ -126,11 +177,11 @@ class GfncFundpageScraper(AbstractScraper):
             except AttributeError:
                 performance_data = []
 
-            fund_performances.append(zip(header, [ticker] + performance_data))
+            fund_performances.append(dict(zip(performance_fields, [ticker] + performance_data)))
 
             # Print progress
             if ticker_no % 100 == 0:
                 print "%d of %d" % (ticker_no, ticker_count)
 
         # write performance data to a CSV file
-        super(GfncFundpageScraper, self).writecsv(header, fund_performances, outputfile)
+        super(GfncFundpageScraper, self).writecsv(performance_fields, fund_performances, outputfile)
