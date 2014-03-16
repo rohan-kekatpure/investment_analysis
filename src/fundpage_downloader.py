@@ -6,7 +6,7 @@ import requests
 import time
 
 
-class FundpageDownloader:
+class FundpageDownloader(object):
     """
     Class for organizing downloads of fund pages from the ticker symbol list
     """

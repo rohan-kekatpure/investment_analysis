@@ -1,44 +1,19 @@
 import csv
-import os
 from pprint import pprint
 import re
 import string
 from bs4 import BeautifulSoup
+from abstract_scraper import AbstractScraper
 from yfnc_key_mappings import YfncKeymappings
 
 
-class YfncFundpageScraper:
+class YfncFundpageScraper(AbstractScraper):
     """
     Methods for scraping downloaded yahoo finance webpages
     """
-
-    # Utility method for writing CSV files
-    @staticmethod
-    def writecsv(csvfields, funddata, output_file):
-            with open(output_file, "wb") as f:
-                writer = csv.DictWriter(f, fieldnames=csvfields,
-                                        delimiter='|',
-                                        quoting=csv.QUOTE_MINIMAL)
-                writer.writeheader()
-                for item in funddata:
-                    writer.writerow(item)
-
-    # Utility method for generating names for intermediate files
-    @staticmethod
-    def insert_suffix(input_path, suffix):
-        dirname = os.path.dirname(input_path)
-        input_file_name, input_file_extn = os.path.basename(input_path).split(".")
-
-        # Prepend a dot  ( "." ) to the input file extension
-        if input_file_extn != "":
-            input_file_extn = "." + input_file_extn
-
-        suffixed_input_path = os.path.join(dirname, input_file_name + suffix + input_file_extn)
-        return suffixed_input_path
-
     def __init__(self, fundpages_location, tickerlist_file, delimiter="|"):
         """
-        Constructs yahoo finance page scraper object.
+        Constructs yahoo finance page scraper object by calling __init__ of AbstractScraper
         @param fundpages_location: Location of downloaded html fund pages (string)
         @type fundpages_location: str
         @param tickerlist_file: Location of csv file containing ticker symbol list
@@ -46,19 +21,17 @@ class YfncFundpageScraper:
         @param delimiter: delimiter in tickerlist_file
         @type delimiter: str
         """
-        self.fundpages_location = fundpages_location
-        assert os.path.exists(self.fundpages_location), \
-            "[YfncFundpageScraper] Folder %s does not exist" % self.fundpages_location
+        super(YfncFundpageScraper, self).__init__(fundpages_location, tickerlist_file, delimiter="|")
 
-        assert os.path.exists(tickerlist_file), \
-            "[YfncFundpageScraper] Folder %s does not exist" % tickerlist_file
+    def scrape(self, output_file):
+        """
+        Delegator function for getting profiles, performance, and risk
+        """
+        self.get_profiles(output_file="%s_profile.csv" % output_file)
+        self.get_performance(output_file="%s_performance.csv" % output_file)
+        self.get_risk(output_file="%s_risk.csv" % output_file)
 
-        # Generate list of tickers from tickerlist_file and store in self.tickers
-        with open(tickerlist_file, "rb") as f:
-            reader = csv.reader(f, delimiter=delimiter)
-            self.tickers = [record[0] for record in reader]
-
-    def get_profiles(self, output_file="./_profiles.csv"):
+    def get_profiles(self, output_file=None):
         """
         Generates fund profile data from downloaded html pages and produces a CSV file
         containing profile data for each ticker.
