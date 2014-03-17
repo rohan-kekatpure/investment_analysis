@@ -7,7 +7,7 @@ from abstract_scraper import AbstractScraper
 from yfnc_key_mappings import YfncKeymappings
 
 
-class YfncFundpageScraper(AbstractScraper):
+class YfncScraper(AbstractScraper):
     """
     Methods for scraping downloaded yahoo finance webpages
     """
@@ -21,7 +21,7 @@ class YfncFundpageScraper(AbstractScraper):
         @param delimiter: delimiter in tickerlist_file
         @type delimiter: str
         """
-        super(YfncFundpageScraper, self).__init__(fundpages_location, tickerlist_file, delimiter="|")
+        super(YfncScraper, self).__init__(fundpages_location, tickerlist_file, delimiter="|")
 
     def scrape(self, output_file):
         """
@@ -80,14 +80,14 @@ class YfncFundpageScraper(AbstractScraper):
                 print "Profile page for ticker %s does not exist...skipping" % ticker
 
         # Now list of profiles is available, write it to an intermediate CSV file
-        unstd_output_filename = YfncFundpageScraper.insert_suffix(output_file, "__UNSTD__")
-        YfncFundpageScraper.writecsv(YfncKeymappings.profile_fields, profile_list, unstd_output_filename)
+        unstd_output_filename = YfncScraper.insert_suffix(output_file, "__UNSTD__")
+        YfncScraper.writecsv(YfncKeymappings.profile_fields, profile_list, unstd_output_filename)
 
         # This CSV written in the above step file is unstandardized:
         # It has field values like net_assets = "120M". We need to standardize this and
         # other fields so they are proper numeric format for database ingestion. We use
         # standardize_profiles to do this final cleanup.
-        YfncFundpageScraper.standardize_profiles(unstd_output_filename, output_file)
+        YfncScraper.standardize_profiles(unstd_output_filename, output_file)
 
     def get_risk(self, output_file="./_risks.csv"):
         """
@@ -154,11 +154,11 @@ class YfncFundpageScraper(AbstractScraper):
                 print "Risk page for ticker %s does not exist...skipping" % ticker
 
         # Now list of profiles is available, write it to an intermediate CSV file
-        unstd_output_filename = YfncFundpageScraper.insert_suffix(output_file, "__UNSTD__")
-        YfncFundpageScraper.writecsv(YfncKeymappings.risk_fields, risk_list, unstd_output_filename)
+        unstd_output_filename = YfncScraper.insert_suffix(output_file, "__UNSTD__")
+        YfncScraper.writecsv(YfncKeymappings.risk_fields, risk_list, unstd_output_filename)
 
         # Now list of fund risks is available, write it to a csvfile
-        YfncFundpageScraper.standardize_risk(unstd_output_filename, output_file,
+        YfncScraper.standardize_risk(unstd_output_filename, output_file,
                                              range(1, len(YfncKeymappings.risk_fields)))
 
     def get_performance(self, output_file="./_performance.csv"):
@@ -206,7 +206,7 @@ class YfncFundpageScraper(AbstractScraper):
             except IOError:
                 print "Performance page for ticker %s does not exist...skipping" % ticker
         # Now list of fund risks is available, write it to a csvfile
-        YfncFundpageScraper.writecsv(YfncKeymappings.performance_fields, performance_list, output_file)
+        YfncScraper.writecsv(YfncKeymappings.performance_fields, performance_list, output_file)
 
     @staticmethod
     def standardize_profiles(inputfile_name, outputfile_name):

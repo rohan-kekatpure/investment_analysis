@@ -6,14 +6,14 @@ from abstract_scraper import AbstractScraper
 from gfnc_key_mappings import GfncKeymappings
 
 
-class GfncFundpageScraper(AbstractScraper):
+class GfncScraper(AbstractScraper):
     """
     Class for scraping google finance fundpages.
     This class is a sibling of the YfncFundpageScraper
     """
     def __init__(self, fundpages_location, tickerlist_file, delimiter="|"):
         """
-        Constructs yahoo finance page scraper object by calling __init__ of AbstractScraper
+        Constructs Google finance page scraper object by calling __init__ of AbstractScraper
         @param fundpages_location: Location of downloaded html fund pages (string)
         @type fundpages_location: str
         @param tickerlist_file: Location of csv file containing ticker symbol list
@@ -21,7 +21,7 @@ class GfncFundpageScraper(AbstractScraper):
         @param delimiter: delimiter in tickerlist_file
         @type delimiter: str
         """
-        super(GfncFundpageScraper, self).__init__(fundpages_location, tickerlist_file, delimiter="|")
+        super(GfncScraper, self).__init__(fundpages_location, tickerlist_file, delimiter="|")
 
     def scrape(self, outputfile=None):
         """
@@ -34,24 +34,24 @@ class GfncFundpageScraper(AbstractScraper):
         # Soup creation is an expensive step and it may make more sense to
         # delegate after generating the soup of the downloaded page.
 
-        # # ------------------------------------
-        # # Get performance
-        # # ------------------------------------
-        # outputfile_performance = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_performance")
-        # print "writing to file %s" % outputfile_performance
-        # self.get_performance(outputfile=outputfile)
+        # ------------------------------------
+        # Get performance
+        # ------------------------------------
+        outputfile_performance = super(GfncScraper, self).insert_suffix(outputfile, "_performance")
+        print "writing to file %s" % outputfile_performance
+        self.get_performance(outputfile=outputfile)
 
-        # # ------------------------------------
-        # # Get risk
-        # # ------------------------------------
-        # outputfile_risk = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_risk")
-        # print "writing to file %s" % outputfile_risk
-        # self.get_risk(outputfile=outputfile_risk)
+        # ------------------------------------
+        # Get risk
+        # ------------------------------------
+        outputfile_risk = super(GfncScraper, self).insert_suffix(outputfile, "_risk")
+        print "writing to file %s" % outputfile_risk
+        self.get_risk(outputfile=outputfile_risk)
 
-        # # ------------------------------------
-        # # Get profile
-        # # ------------------------------------
-        outputfile_profile = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_profile")
+        # ------------------------------------
+        # Get profile
+        # ------------------------------------
+        outputfile_profile = super(GfncScraper, self).insert_suffix(outputfile, "_profile")
         print "writing profile data to file %s" % outputfile_profile
         self.get_profile(outputfile=outputfile_profile)
 
@@ -148,7 +148,7 @@ class GfncFundpageScraper(AbstractScraper):
 
         # Aggregate profile fields
         profile_fields_all = ["ticker"] + management_fields + allocation_fields
-        super(GfncFundpageScraper, self).writecsv(profile_fields_all, profile_list, outputfile)
+        super(GfncScraper, self).writecsv(profile_fields_all, profile_list, outputfile)
 
     def get_risk(self, outputfile=None):
         """
@@ -215,7 +215,7 @@ class GfncFundpageScraper(AbstractScraper):
         risk_fields_flattened = ["ticker"] + reduce(lambda x, y: x + y, risk_fields)
 
         # Write the CSV file
-        super(GfncFundpageScraper, self).writecsv(risk_fields_flattened, risk_list, outputfile)
+        super(GfncScraper, self).writecsv(risk_fields_flattened, risk_list, outputfile)
 
     def get_performance(self, outputfile=None):
         """
@@ -264,7 +264,7 @@ class GfncFundpageScraper(AbstractScraper):
                 print "%d of %d" % (ticker_no, ticker_count)
 
         # write performance data to a CSV file
-        super(GfncFundpageScraper, self).writecsv(["ticker"] + performance_fields, performance_list, outputfile)
+        super(GfncScraper, self).writecsv(["ticker"] + performance_fields, performance_list, outputfile)
 
     def get_performance2(self, outputfile=None):
         """
@@ -310,4 +310,4 @@ class GfncFundpageScraper(AbstractScraper):
                 print "%d of %d" % (ticker_no, ticker_count)
 
         # write performance data to a CSV file
-        super(GfncFundpageScraper, self).writecsv(performance_fields, fund_performances, outputfile)
+        super(GfncScraper, self).writecsv(performance_fields, fund_performances, outputfile)
