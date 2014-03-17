@@ -40,7 +40,7 @@ from ticker_generator import TickerGenerator
 
 fundpages_location = "/Users/rkekatpure/work/code/investing/html/gfnc_fund_pages"
 tickerlist_file = "/Users/rkekatpure/work/code/investing/csv/marketwatch_ticker_list.csv"
-outputfile = "/Users/rkekatpure/work/code/investing/csv/gfnc_performance.csv"
+outputfile = "/Users/rkekatpure/work/code/investing/csv/gfnc.csv"
 gfnc_scraper = GfncFundpageScraper(fundpages_location=fundpages_location,
                                    tickerlist_file=tickerlist_file,
                                    delimiter="|")

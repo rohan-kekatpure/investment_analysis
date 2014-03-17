@@ -1,4 +1,4 @@
-class YfncKeymappings:
+class YfncKeymappings(object):
     """
     Holds mapping between field names in HTML fund pages and the
     names which we want to store in database.

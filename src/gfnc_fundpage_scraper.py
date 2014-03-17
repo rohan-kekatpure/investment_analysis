@@ -3,6 +3,7 @@ import re
 from bs4 import BeautifulSoup
 from tidylib import tidy_document
 from abstract_scraper import AbstractScraper
+from gfnc_key_mappings import GfncKeymappings
 
 
 class GfncFundpageScraper(AbstractScraper):
@@ -33,12 +34,115 @@ class GfncFundpageScraper(AbstractScraper):
         # Soup creation is an expensive step and it may make more sense to
         # delegate after generating the soup of the downloaded page.
 
+        # # ------------------------------------
+        # # Get risk
+        # # ------------------------------------
         # outputfile_performance = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_performance")
+        # print "writing to file %s" % outputfile_performance
         # self.get_performance(outputfile=outputfile)
 
-        outputfile_risk = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_risk")
-        print "writing to file %s" % outputfile_risk
-        self.get_risk(outputfile=outputfile_risk)
+        # # ------------------------------------
+        # # Get risk
+        # # ------------------------------------
+        # outputfile_risk = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_risk")
+        # print "writing to file %s" % outputfile_risk
+        # self.get_risk(outputfile=outputfile_risk)
+
+        # # ------------------------------------
+        # # Get profile
+        # # ------------------------------------
+        outputfile_profile = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_profile")
+        print "writing profile data to file %s" % outputfile_profile
+        self.get_profile(outputfile=outputfile_profile)
+
+    def get_profile(self, outputfile=None):
+
+        """
+        Scraper to get profile (net assets, exp ratio) data
+        """
+        management_fields = ["total_assets", "front_load", "deferred_load", "expense_ratio", "management_fees", "fund_family"]
+        allocation_fields = ["pct_cash", "pct_stock", "pct_bonds", "pct_preferred", "pct_convertible", "pct_other"]
+
+        ticker_count = len(self.tickers)
+        profile_list = []
+        for ticker_no, ticker in enumerate(self.tickers):
+            page = os.path.join(self.fundpages_location, "%s.html" % ticker)
+            newpage, errors = tidy_document(open(page).read())
+            soup = BeautifulSoup(newpage)
+
+            # Initialize a dict to hold risk data of this ticker. The data will be added
+            # at the ned of the try block
+            profile_dict = {"ticker": ticker}
+
+            try:
+                profile_data_tables = \
+                    soup\
+                    .body\
+                    .findAll('div', id='gf-viewc')[0]\
+                    .findAll('div', class_='fjfe-content')[0]\
+                    .findAll('div', class_='mutualfund')[0]\
+                    .findAll('div', class_='g-section g-tpl-right-1')[0]\
+                    .findAll('div', class_='g-unit g-first')[0]\
+                    .findAll('div', class_='g-c')[0]\
+                    .findAll('div', class_='sector')
+
+                # Extract and clean profile fields
+                management_table = profile_data_tables[2]\
+                    .findAll('div', class_='subsector')[0]\
+                    .table
+
+                management_data_raw = [[col.text.strip() for col in row.findAll('td')]
+                                       for row in management_table.findAll('tr')]
+
+                management_data_clean = map(lambda x: '' if x == '-' else x,
+                                            [P[1] for P in management_data_raw])
+
+                # Clean up 'total_assets' fields by removing millions and billions suffix
+                total_assets = management_data_clean[0]
+                if total_assets.endswith("M"):
+                    total_assets = float(total_assets.replace("M", ""))
+                elif total_assets.endswith("B"):
+                    total_assets = 1000.0 * float(total_assets.replace("B", ""))
+                management_data_clean[0] = total_assets
+
+                # Clean up 'front_load', 'deferred_load' and 'expense_ratio' fields
+                # by removing the percent '%' symbol at the end and converting to float
+                management_data_clean[1:4] = map(lambda x: x.replace("%", "") if x != "" else x,
+                                                 management_data_clean[1:4])
+
+                # Add management data to current fund profile
+                profile_dict.update(dict(zip(management_fields, management_data_clean)))
+
+                # Extract and clean asset allocation data
+                # allocation_table = soup.body.findAll('div', class_='sector')[3].table
+                allocation_table = profile_data_tables[3].table
+                allocation_data_raw = [[col.text.strip() for col in row.findAll('td')]
+                                       for row in allocation_table.findAll('tr')]
+
+                # Allocations only list the asset categories in the fund. A fund with 'cash'
+                # and 'stocks' will not have 'bond' = '-', 'convertibles'='-' etc.
+                # We therefore need to make sure that the output dictionary contains all the
+                # fields even if they are empty. We initialize an empty dictionary and fill it
+                # with values of existing asset categories for the current fund.
+                allocations_dict = dict.fromkeys(allocation_fields, "")
+                for asset_class, allocation_pct, _ in allocation_data_raw:
+                    allocations_dict[GfncKeymappings.allocations_keymap[asset_class]] = allocation_pct
+
+                # Add asset allocation data to profile data
+                profile_dict.update(allocations_dict)
+            except (IndexError, KeyError), E:
+                print "[%s] could not parse %s" % (E.message, page)
+
+            # Append current fund profile to profiles_list
+            profile_list.append(profile_dict)
+
+            # publish progress
+            if ticker_no % 100 == 0:
+                print "%d of %d" % (ticker_no, ticker_count)
+
+        # Aggregate profile fields
+        profile_fields_all = ["ticker"] + management_fields + allocation_fields
+        super(GfncFundpageScraper, self).writecsv(profile_fields_all, profile_list, outputfile)
 
     def get_risk(self, outputfile=None):
         """
@@ -55,9 +159,9 @@ class GfncFundpageScraper(AbstractScraper):
         risk_list = []
         for ticker_no, ticker in enumerate(self.tickers):
             page = os.path.join(self.fundpages_location, "%s.html" % ticker)
-            # print "scraping page %s" % page
             newpage, errors = tidy_document(open(page).read())
             soup = BeautifulSoup(newpage)
+
             # Initialize a dict to hold risk data of this ticker. The data will be added
             # at the ned of the try block
             riskdata_dict = {"ticker": ticker}
@@ -67,29 +171,30 @@ class GfncFundpageScraper(AbstractScraper):
                 risktable = \
                     soup\
                     .body\
-                    .div(id='gf-viewc')[0]\
-                    .findAll('div', class_='fjfe-content')[0]\
-                    .findAll('div', class_='mutualfund')[0]\
-                    .findAll('div', class_='g-section g-tpl-right-1')[0]\
-                    .findAll('div', class_='g-unit')[1]\
-                    .findAll('div', class_='g-c sfe-break-right')[0]\
-                    .findAll('div', class_='sector')[1]\
-                    .findAll('div', class_='subsector')[0].table
+                    .div(id="gf-viewc")[0]\
+                    .findAll("div", class_="fjfe-content")[0]\
+                    .findAll("div", class_="mutualfund")[0]\
+                    .findAll("div", class_="g-section g-tpl-right-1")[0]\
+                    .findAll("div", class_="g-unit")[1]\
+                    .findAll("div", class_="g-c sfe-break-right")[0]\
+                    .findAll("div", class_="sector")[1]\
+                    .findAll("div", class_="subsector")[0].table
 
                 riskdata_raw = [
-                    [row.text.strip() for row in rows.findAll('td')]
-                    for rows in risktable.findAll('tr')
+                    [col.text.strip() for col in row.findAll("td")]
+                    for row in risktable.findAll("tr")
                 ]
 
                 # Convert available fields to float. Unavailable fields are presented as '-'
                 # in the html, convert them to empty strings.
-                riskdata_float = [map(lambda x: float(x) if x != '-' else '', R[1:])
+                riskdata_float = [map(lambda x: float(x) if x != "-" else "", R[1:])
                                   for R in riskdata_raw[1:-1]]
 
                 # Add the risk data for this ticker to riskdata_dict
                 for field_type, field_data in zip(risk_fields, riskdata_float):
                     riskdata_dict.update(dict(zip(field_type, field_data)))
             except (IndexError, AttributeError):
+                pass
                 # print "page could not be scraped for ticker %s" % ticker
 
             # Append risk data for the current ticker to the list
