@@ -35,7 +35,7 @@ class GfncFundpageScraper(AbstractScraper):
         # delegate after generating the soup of the downloaded page.
 
         # # ------------------------------------
-        # # Get risk
+        # # Get performance
         # # ------------------------------------
         # outputfile_performance = super(GfncFundpageScraper, self).insert_suffix(outputfile, "_performance")
         # print "writing to file %s" % outputfile_performance
@@ -103,6 +103,10 @@ class GfncFundpageScraper(AbstractScraper):
                     total_assets = float(total_assets.replace("M", ""))
                 elif total_assets.endswith("B"):
                     total_assets = 1000.0 * float(total_assets.replace("B", ""))
+                elif total_assets == "":
+                    total_assets = -1.0  # Sentinel value to indicate missing total_asset information
+                else:
+                    total_assets = float(total_assets.replace(",", "")) / 1000000.0  # Total assets in dollars, convert to Millions
                 management_data_clean[0] = total_assets
 
                 # Clean up 'front_load', 'deferred_load' and 'expense_ratio' fields
@@ -126,13 +130,15 @@ class GfncFundpageScraper(AbstractScraper):
                 # with values of existing asset categories for the current fund.
                 allocations_dict = dict.fromkeys(allocation_fields, "")
                 for asset_class, allocation_pct, _ in allocation_data_raw:
-                    allocations_dict[GfncKeymappings.allocations_keymap[asset_class]] = allocation_pct
+                    allocations_dict[GfncKeymappings.allocations_keymap[asset_class]] = allocation_pct.replace("%", "")
 
                 # Add asset allocation data to profile data
                 profile_dict.update(allocations_dict)
-            except (IndexError, KeyError), E:
-                print "[%s] could not parse %s" % (E.message, page)
-
+            except IndexError, E:
+                print "[IndexError: %s] could not parse %s" % (E.message, page)
+            except KeyError, K:
+                # print "[KeyError: %s] could not parse %s" % (K.message, page)
+                pass
             # Append current fund profile to profiles_list
             profile_list.append(profile_dict)
 

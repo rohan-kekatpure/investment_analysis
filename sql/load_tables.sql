@@ -74,14 +74,97 @@
 -- from '/Users/rkekatpure/work/code/investing/csv/fund_risk_std.csv'
 -- with csv header delimiter as '|';
 
+
+---------------------------------------------------------------------------
+-- Load google finance mutual fund data
+---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+-- profiles
+---------------------------------------------------------------------------
+drop table if exists gfnc_profiles;
+create table gfnc_profiles (
+  ticker varchar(5),
+  total_assets float,
+  front_load float,
+  deferred_load float,
+  expense_ratio float,
+  management_fees float,
+  fund_family varchar(50),
+  pct_cash float,
+  pct_stocks float,
+  pct_bonds float,
+  pct_preferred float ,
+  pct_convertible float,
+  pct_other float
+);
+copy gfnc_profiles
+from '/Users/rkekatpure/work/code/investing/csv/gfnc_profile.csv'
+with csv header delimiter as '|';
+
+---------------------------------------------------------------------------
+-- performance
+---------------------------------------------------------------------------
+drop table if exists gfnc_performance;
+create table gfnc_performance (
+  ticker varchar(5),
+  r1d float,
+  r1w float,
+  r4w float,
+  r3m float,
+  rytd float,
+  r1y float,
+  r3y float,
+  r5y float
+);
+copy gfnc_performance
+from '/Users/rkekatpure/work/code/investing/csv/gfnc_performance.csv'
+with csv header delimiter as '|';
+
+---------------------------------------------------------------------------
+-- performance
+---------------------------------------------------------------------------
+drop table if exists gfnc_risk;
+create table gfnc_risk (
+  ticker varchar(5),
+  alpha1 float,
+  alpha3 float,
+  alpha5 float,
+  alpha10 float,
+  beta1 float,
+  beta3 float,
+  beta5 float,
+  beta10 float,
+  MAR1 float,
+  MAR3 float,
+  MAR5 float,
+  MAR10 float,
+  R2_1 float,
+  R2_3 float,
+  R2_5 float,
+  R2_10 float,
+  SD1 float,
+  SD3 float,
+  SD5 float,
+  SD10 float,
+  sharpe1 float,
+  sharpe3 float,
+  sharpe5 float,
+  sharpe10 float
+);
+copy gfnc_risk
+from '/Users/rkekatpure/work/code/investing/csv/gfnc_risk.csv'
+with csv header delimiter as '|';
+
+
 -- Start analysis
-drop table if exists temp1;
-create table temp1 as
-select A.*,
-B.sharpe3, B.sharpe5, B.sharpe10, C.r1, C.r3, C.r5, C.r10
-from profiles A
-inner join risk B on A.ticker=B.ticker
-inner join performance C on A.ticker=C.ticker;
+-- drop table if exists temp1;
+-- create table temp1 as
+-- select A.*,
+-- B.sharpe3, B.sharpe5, B.sharpe10, C.r1, C.r3, C.r5, C.r10
+-- from profiles A
+-- inner join risk B on A.ticker=B.ticker
+-- inner join performance C on A.ticker=C.ticker;
 
 
 
